@@ -140,6 +140,8 @@ RUN CUDA_VER=$(echo "${CUDA_VERSION}" | sed 's/.$//' | tr -d '.') && python3.10 
 ENV TCNN_CUDA_ARCHITECTURES=${CUDA_ARCHITECTURES}
 RUN python3.10 -m pip install --no-cache-dir git+https://github.com/NVlabs/tiny-cuda-nn.git#subdirectory=bindings/torch
 
+
+
 # Install pycolmap, required by hloc.
 RUN git clone --branch v0.4.0 --recursive https://github.com/colmap/pycolmap.git && \
     cd pycolmap && \
@@ -166,6 +168,9 @@ RUN git clone --recursive https://github.com/cvg/pixel-perfect-sfm.git && \
     git clean -df && \
     python3.10 -m pip install --no-cache-dir -e . && \
     cd ..
+
+# Install PyTorch3D (required by nerfstudio)
+RUN python3.10 -m pip install --no-cache-dir "git+https://github.com/facebookresearch/pytorch3d.git@stable"
 
 # Copy nerfstudio folder and give ownership to user.
 COPY --chown=${USER_UID}:${USER_GID} . /home/${USERNAME}/nerfstudio
