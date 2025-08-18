@@ -172,6 +172,9 @@ RUN git clone --recursive https://github.com/cvg/pixel-perfect-sfm.git && \
 # Install PyTorch3D (required by nerfstudio)
 RUN python3.10 -m pip install --no-cache-dir "git+https://github.com/facebookresearch/pytorch3d.git@stable"
 
+# Install nvdiffrast (required by nerfstudio)
+RUN python3.10 -m pip install --no-cache-dir "git+https://github.com/NVlabs/nvdiffrast.git"
+
 # Copy nerfstudio folder and give ownership to user.
 COPY --chown=${USER_UID}:${USER_GID} . /home/${USERNAME}/nerfstudio
 
