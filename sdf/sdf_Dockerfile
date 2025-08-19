@@ -1,5 +1,5 @@
 # Define base image.
-FROM nvidia/cudagl:11.8-devel
+FROM nvidia/cudagl:11.3.1-devel
 
 # Set environment variables.
 ## Set non-interactive to prevent asking for user inputs blocking image creation.
@@ -43,7 +43,16 @@ RUN apt-get update && \
     curl \
     unzip \
     libgl1-mesa-glx \
-    libglib2.0-0
+    libglib2.0-0 \
+    # FFmpeg development libraries required by PyAV
+    libavformat-dev \
+    libavcodec-dev \
+    libavdevice-dev \
+    libavutil-dev \
+    libavfilter-dev \
+    libswscale-dev \
+    libswresample-dev \
+    pkg-config
 
 # Install GLOG (required by ceres).
 RUN git clone --branch v0.6.0 https://github.com/google/glog.git --single-branch && \
