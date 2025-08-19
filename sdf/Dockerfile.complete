@@ -1,0 +1,162 @@
+# Define base image.
+FROM nvidia/cudagl:11.3.1-devel
+
+# Set environment variables.
+## Set non-interactive to prevent asking for user inputs blocking image creation.
+ENV DEBIAN_FRONTEND=noninteractive
+## Set timezone as it is required by some packages.
+ENV TZ=Europe/Berlin
+## CUDA architectures, required by tiny-cuda-nn.
+ENV TCNN_CUDA_ARCHITECTURES=86
+## CUDA Home, required to find CUDA in some packages.
+ENV CUDA_HOME="/usr/local/cuda"
+
+# Install required apt packages.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    ffmpeg \
+    git \
+    libatlas-base-dev \
+    libboost-filesystem-dev \
+    libboost-graph-dev \
+    libboost-program-options-dev \
+    libboost-system-dev \
+    libboost-test-dev \
+    libcgal-dev \
+    libeigen3-dev \
+    libfreeimage-dev \
+    libgflags-dev \
+    libglew-dev \
+    libgoogle-glog-dev \
+    libmetis-dev \
+    libprotobuf-dev \
+    libqt5opengl5-dev \
+    libsuitesparse-dev \
+    nano \
+    protobuf-compiler \
+    python3.8-dev \
+    python3-pip \
+    qtbase5-dev \
+    wget
+
+# Install GLOG (required by ceres).
+RUN git clone --branch v0.6.0 https://github.com/google/glog.git --single-branch && \
+    cd glog && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make -j && \
+    make install && \
+    cd ../.. && \
+    rm -r glog
+# Add glog path to LD_LIBRARY_PATH.
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/local/lib"
+
+# Install Ceres-solver (required by colmap).
+RUN git clone --branch 2.1.0 https://ceres-solver.googlesource.com/ceres-solver.git --single-branch && \
+    cd ceres-solver && \
+    git checkout $(git describe --tags) && \
+    mkdir build && \
+    cd build && \
+    cmake .. -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF && \
+    make -j && \
+    make install && \
+    cd ../.. && \
+    rm -r ceres-solver
+
+# Install colmap.
+RUN git clone --branch 3.7 https://github.com/colmap/colmap.git --single-branch && \
+    cd colmap && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make -j && \
+    make install && \
+    cd ../.. && \
+    rm -r colmap
+    
+# Create non root user and setup environment.
+RUN useradd -m -d /home/user -u 1000 user
+
+# Switch to new user and workdir.
+USER 1000:1000
+WORKDIR /home/user
+
+# Add local user binary folder to PATH variable.
+ENV PATH="${PATH}:/home/user/.local/bin"
+SHELL ["/bin/bash", "-c"]
+
+# Upgrade pip and install packages.
+RUN python3.8 -m pip install --upgrade pip setuptools pathtools promise
+
+# Install pytorch and submodules (using versions from env.sh).
+RUN python3.8 -m pip install torch==2.1.2+cu118 torchvision==0.16.2+cu118 --extra-index-url https://download.pytorch.org/whl/cu118
+
+# Install tiny-cuda-nn.
+RUN python3.8 -m pip install git+https://github.com/NVlabs/tiny-cuda-nn.git#subdirectory=bindings/torch
+
+# Install additional packages from env.sh
+RUN python3.8 -m pip install functorch --no-deps
+RUN python3.8 -m pip install torchmetrics[image]
+RUN python3.8 -m pip install torchtyping
+
+# Install accelerate, diffusers, tokenizers, transformers, xformers
+RUN python3.8 -m pip install accelerate==0.27.2
+RUN python3.8 -m pip install diffusers==0.30.2
+RUN python3.8 -m pip install tokenizers==0.15.2
+RUN python3.8 -m pip install transformers==4.37.2
+RUN python3.8 -m pip install xformers==0.0.23 --index-url https://download.pytorch.org/whl/cu118 --no-deps
+
+# Install omegaconf, tabulate, pandas
+RUN python3.8 -m pip install omegaconf
+RUN python3.8 -m pip install tabulate
+RUN python3.8 -m pip install pandas
+
+# Install torch-scatter
+RUN python3.8 -m pip install torch-scatter -f https://data.pyg.org/whl/torch-2.1.2+cu118.html
+
+# Install typeguard and tyro
+RUN python3.8 -m pip install "typeguard==2.12.1"
+RUN python3.8 -m pip install --upgrade tyro
+
+# Install nvdiffrast
+RUN python3.8 -m pip install git+https://github.com/NVlabs/nvdiffrast.git
+
+# Install PyTorch3D
+RUN python3.8 -m pip install "git+https://github.com/facebookresearch/pytorch3d.git@stable"
+
+# Install scikit-learn and imageio
+RUN python3.8 -m pip install scikit-learn
+RUN python3.8 -m pip install imageio[ffmpeg]
+
+# Install hydra packages
+RUN python3.8 -m pip install hydra-core --upgrade --pre
+RUN python3.8 -m pip install hydra-submitit-launcher --upgrade
+
+# Install visdom
+RUN python3.8 -m pip install visdom
+
+# Install kaolin
+RUN python3.8 -m pip install kaolin==0.15.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-2.1.1_cu118.html
+
+# Install transformations
+RUN python3.8 -m pip install transformations
+
+# Copy nerfstudio folder and give ownership to user.
+ADD . /home/user/nerfstudio
+USER root
+RUN chown -R user:user /home/user/nerfstudio
+USER 1000:1000
+
+# Install nerfstudio dependencies.
+RUN cd nerfstudio && \
+    python3.8 -m pip install -e . && \
+    cd ..
+
+# Change working directory
+WORKDIR /workspace
+
+# Install nerfstudio cli auto completion and enter shell if no command was provided.
+CMD ns-install-cli --mode install && /bin/bash 
