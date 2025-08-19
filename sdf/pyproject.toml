@@ -15,7 +15,7 @@ classifiers = [
 ]
 dependencies = [
     "appdirs>=1.4",
-    "av==9.2.0",
+    "av>=9.2.0",
     "tyro>=0.3.31",
     "gdown==4.6.0",
     "ninja==1.10.2.3",
